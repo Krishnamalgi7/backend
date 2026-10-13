@@ -867,21 +867,31 @@ const updatePhone = async (req, res) => {
 
       let imagesToRemove = [];
 
-      if (removedAdditionalImages) {
-        try {
-          const parsedImages = JSON.parse(removedAdditionalImages);
+      
 
-          imagesToRemove = parsedImages.map((image) =>
-            image.startsWith(API_BASE_URL)
-              ? image.replace(API_BASE_URL, "")
-              : image,
-          );
-        } catch (error) {
-          return res.status(400).json({
-            message: "Invalid removed additional images data",
-          });
-        }
+if (removedAdditionalImages) {
+  try {
+    const parsedImages = JSON.parse(removedAdditionalImages);
+
+    imagesToRemove = parsedImages.map((image) => {
+      try {
+        // Convert a full image URL into its stored relative path.
+        // Example: https://backend.example.com/uploads/Phone/image.jpg
+        // becomes: /uploads/Phone/image.jpg
+        return decodeURIComponent(new URL(image).pathname);
+      } catch {
+        // If it is already a relative path, keep it unchanged.
+        return image;
       }
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: "Invalid removed additional images data",
+    });
+  }
+}
+
+
 
       const remainingImages = existingImages.filter(
         (image) => !imagesToRemove.includes(image),
