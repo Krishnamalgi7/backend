@@ -754,18 +754,6 @@ const updatePhone = async (req, res) => {
       });
     }
 
-    // Rating validation
-    const phoneRating =
-      averageRating === undefined || averageRating === ""
-        ? 0
-        : Number(averageRating);
-
-    if (Number.isNaN(phoneRating) || phoneRating < 0 || phoneRating > 5) {
-      return res.status(400).json({
-        message: "Rating must be a number between 0 and 5",
-      });
-    }
-
     // Discount validation
     const discountPercentage = discount ? discount.percentage : 0;
 
