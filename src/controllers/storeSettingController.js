@@ -60,6 +60,8 @@ const updateStoreSetting = async (req, res) => {
 
     if (req.file) {
       setting.logo = `/uploads/${req.file.filename}`;
+    } else if (req.body.removeLogo === "true") {
+      setting.logo = "";
     }
 
     await setting.save();
