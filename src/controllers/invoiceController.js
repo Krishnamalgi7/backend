@@ -653,7 +653,7 @@ const getCustomerInvoices = async (req, res) => {
     const invoices = await Invoice.find({ customerId })
       .sort({ invoiceDate: -1 })
       .select(
-        "invoiceNumber invoiceDate storeName customerName items gstPercentage gstAmount taxableSubtotal roundedOff totalAmount amountInWords createdAt"
+        "invoiceNumber invoiceDate storeName storeLogo storeAddress storePhone storeGstNumber customerName customerPhone customerEmail customerAddress items gstPercentage gstAmount taxableSubtotal roundedOff totalAmount amountInWords createdAt"
       )
       .populate({
         path: "items.phoneId",
