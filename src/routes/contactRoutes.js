@@ -1,11 +1,15 @@
 const express = require("express");
 
 const verifyToken = require("../middleware/authMiddleware");
+const customerAuthMiddleware = require("../middleware/customerAuthMiddleware");
 
 const {
   createContact,
   getContacts,
-   updateContactStatus,
+  updateContactStatus,
+  replyToContact,
+  createMobileContact,
+  getMyMobileContacts,
 } = require("../controllers/contactController");
 
 const router = express.Router();
@@ -13,10 +17,19 @@ const router = express.Router();
 // Submit contact form
 router.post("/", createContact);
 
+// Submit contact message from authenticated mobile customer
+router.post("/mobile", customerAuthMiddleware, createMobileContact);
+
 // Get all contact messages
 router.get("/", verifyToken, getContacts);
 
 // Mark contact message as completed
 router.patch("/:id/status", verifyToken, updateContactStatus);
+
+// Reply to a customer contact message
+router.patch("/:id/reply", verifyToken, replyToContact);
+
+// Get contact messages for authenticated mobile customer
+router.get("/mobile/my-messages", customerAuthMiddleware, getMyMobileContacts);
 
 module.exports = router;

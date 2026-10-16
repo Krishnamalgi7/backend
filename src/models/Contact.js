@@ -20,6 +20,18 @@ const contactSchema = new mongoose.Schema(
       trim: true,
     },
 
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+    },
+
+    reply: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     status: {
       type: String,
       enum: ["pending", "completed"],
