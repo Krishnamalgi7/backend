@@ -18,6 +18,7 @@ const romRoutes = require("./routes/romRoutes");
 const storeSettingRoutes = require("./routes/storeSettingRoutes");
 const colorRoutes = require("./routes/colorRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
+const stockNotificationRoutes = require("./routes/stockNotificationRoutes");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/rams", ramRoutes);
 app.use("/api/roms", romRoutes);
 app.use("/api/store-settings", storeSettingRoutes);
 app.use("/api/ratings", ratingRoutes);
+app.use("/api/stock-notifications", stockNotificationRoutes);
 app.use("/api/invoices", invoiceRoutes);
 
 const PORT = process.env.PORT || 5000;

@@ -1,4 +1,5 @@
 const Phone = require("../models/Phone");
+const StockNotification = require("../models/StockNotification");
 const Brand = require("../models/Brand");
 const Variant = require("../models/Variant");
 const Ram = require("../models/Ram");
@@ -955,7 +956,10 @@ if (removedAdditionalImages) {
       updateData.images = [...remainingImages, ...newAdditionalImages];
     }
 
-    //UPDATE PHONE
+    
+    // UPDATE PHONE
+    const previousQuantity = phone.quantity;
+
     const updatedPhone = await Phone.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -964,6 +968,23 @@ if (removedAdditionalImages) {
         runValidators: true,
       },
     );
+
+    // Detect when an out-of-stock phone becomes available
+    
+    if (previousQuantity === 0 && updatedPhone.quantity > 0) {
+      await StockNotification.updateMany(
+        {
+          phoneId: updatedPhone._id,
+          status: "pending",
+        },
+        {
+          $set: {
+            status: "notified",
+            notifiedAt: new Date(),
+          },
+        },
+      );
+    }
 
     res.status(200).json({
       message: "Phone updated successfully",
