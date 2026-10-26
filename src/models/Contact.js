@@ -26,10 +26,43 @@ const contactSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Keep the existing reply field for backward compatibility.
     reply: {
       type: String,
       default: "",
       trim: true,
+    },
+
+    // Store the complete conversation history.
+    messages: [
+      {
+        sender: {
+          type: String,
+          enum: ["customer", "admin"],
+          required: true,
+        },
+
+        text: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
+    lastAdminReplyAt: {
+      type: Date,
+      default: null,
+    },
+
+    lastAdminReplyReadAt: {
+      type: Date,
+      default: null,
     },
 
     status: {

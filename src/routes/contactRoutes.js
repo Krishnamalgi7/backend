@@ -11,6 +11,8 @@ const {
   replyToContact,
   createMobileContact,
   getMyMobileContacts,
+  getMyUnreadQueryNotificationCount,
+  markMyQueryNotificationRead,
 } = require("../controllers/contactController");
 
 const router = express.Router();
@@ -36,4 +38,17 @@ router.patch("/:id/reply", verifyToken, replyToContact);
 // Get contact messages for authenticated mobile customer
 router.get("/mobile/my-messages", customerAuthMiddleware, getMyMobileContacts);
 
+// Get unread admin-reply notification count for mobile customer
+router.get(
+  "/mobile/notifications/unread-count",
+  customerAuthMiddleware,
+  getMyUnreadQueryNotificationCount,
+);
+
+// Mark a query notification as read
+router.patch(
+  "/mobile/notifications/:id/read",
+  customerAuthMiddleware,
+  markMyQueryNotificationRead,
+);
 module.exports = router;

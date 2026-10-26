@@ -1,5 +1,32 @@
 const Contact = require("../models/Contact");
 
+// Build conversation history for older contacts that only have
+const initializeConversation = (contact) => {
+  if (!Array.isArray(contact.messages)) {
+    contact.messages = [];
+  }
+
+  if (contact.messages.length > 0) {
+    return;
+  }
+
+  if (contact.message?.trim()) {
+    contact.messages.push({
+      sender: "customer",
+      text: contact.message.trim(),
+      createdAt: contact.createdAt || new Date(),
+    });
+  }
+
+  if (contact.reply?.trim()) {
+    contact.messages.push({
+      sender: "admin",
+      text: contact.reply.trim(),
+      createdAt: contact.updatedAt || new Date(),
+    });
+  }
+};
+
 // Create a contact message
 const createContact = async (req, res) => {
   try {
@@ -9,6 +36,12 @@ const createContact = async (req, res) => {
       name,
       phone,
       message,
+      messages: [
+        {
+          sender: "customer",
+          text: message.trim(),
+        },
+      ],
     });
 
     res.status(201).json({
@@ -37,15 +70,15 @@ const getContacts = async (req, res) => {
 
     const filter = {};
 
-if (status !== "all") {
-  if (!["pending", "in_progress", "completed"].includes(status)) {
-    return res.status(400).json({
-      message: "Invalid contact status filter",
-    });
-  }
+    if (status !== "all") {
+      if (!["pending", "in_progress", "completed"].includes(status)) {
+        return res.status(400).json({
+          message: "Invalid contact status filter",
+        });
+      }
 
-  filter.status = status;
-}
+      filter.status = status;
+    }
 
     if (typeof search === "string" && search.trim()) {
       const escapedSearch = search
@@ -127,6 +160,8 @@ const getContactById = async (req, res) => {
       });
     }
 
+    initializeConversation(contact);
+
     return res.status(200).json({ contact });
   } catch (error) {
     console.error("Failed to fetch contact details:", error);
@@ -195,9 +230,37 @@ const replyToContact = async (req, res) => {
       });
     }
 
+    // Preserve the original message and any legacy reply.
+    initializeConversation(contact);
+
+    // Append the new admin reply instead of overwriting history.
+    const newMessage = {
+      sender: "admin",
+      text: reply.trim(),
+      createdAt: new Date(),
+    };
+
+    contact.messages.push(newMessage);
+
+    // Keep the latest reply field for existing frontend compatibility.
     contact.reply = reply.trim();
 
+    // Track the latest admin reply for mobile notifications.
+    contact.lastAdminReplyAt = newMessage.createdAt;
+    contact.lastAdminReplyReadAt = null;
+
     await contact.save();
+
+    // Notify connected clients without changing existing socket events.
+    const io = req.app.get("io");
+
+    if (io) {
+      io.emit("contact-conversation-updated", {
+        contactId: contact._id,
+        message: newMessage,
+        contact,
+      });
+    }
 
     if (!contact) {
       return res.status(404).json({
@@ -241,6 +304,12 @@ const createMobileContact = async (req, res) => {
       phone: phone.trim(),
       message: message.trim(),
       customerId,
+      messages: [
+        {
+          sender: "customer",
+          text: message.trim(),
+        },
+      ],
     });
 
     req.app.get("io").emit("new-contact-message", contact);
@@ -270,8 +339,10 @@ const getMyMobileContacts = async (req, res) => {
     }
 
     const contacts = await Contact.find({ customerId })
-      .select("name phone message reply status createdAt updatedAt")
+      .select("name phone message reply messages status createdAt updatedAt lastAdminReplyAt lastAdminReplyReadAt")
       .sort({ createdAt: -1 });
+
+    contacts.forEach(initializeConversation);
 
     return res.status(200).json(contacts);
   } catch (error) {
@@ -279,6 +350,78 @@ const getMyMobileContacts = async (req, res) => {
 
     return res.status(500).json({
       message: "Failed to fetch contact messages",
+    });
+  }
+};
+
+// Get unread admin-reply notification count for mobile customer
+const getMyUnreadQueryNotificationCount = async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId;
+
+    if (!customerId) {
+      return res.status(401).json({
+        message: "Customer authentication required",
+      });
+    }
+
+    const count = await Contact.countDocuments({
+      customerId,
+      lastAdminReplyAt: { $ne: null },
+      lastAdminReplyReadAt: null,
+    });
+
+    return res.status(200).json({ count });
+  } catch (error) {
+    console.error("Failed to fetch unread query notification count:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch unread query notification count",
+    });
+  }
+};
+
+
+// Mark a customer's admin reply notification as read
+const markMyQueryNotificationRead = async (req, res) => {
+  try {
+    const customerId = req.customer?.customerId;
+    const { id } = req.params;
+
+    if (!customerId) {
+      return res.status(401).json({
+        message: "Customer authentication required",
+      });
+    }
+
+    const contact = await Contact.findOneAndUpdate(
+      {
+        _id: id,
+        customerId,
+        lastAdminReplyAt: { $ne: null },
+        lastAdminReplyReadAt: null,
+      },
+      {
+        $set: { lastAdminReplyReadAt: new Date() },
+      },
+      { new: true },
+    );
+
+    if (!contact) {
+      return res.status(404).json({
+        message: "Unread query notification not found",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Query notification marked as read",
+      contact,
+    });
+  } catch (error) {
+    console.error("Failed to mark query notification as read:", error);
+
+    return res.status(500).json({
+      message: "Failed to mark query notification as read",
     });
   }
 };
@@ -291,4 +434,6 @@ module.exports = {
   replyToContact,
   createMobileContact,
   getMyMobileContacts,
+  getMyUnreadQueryNotificationCount,
+  markMyQueryNotificationRead,
 };
