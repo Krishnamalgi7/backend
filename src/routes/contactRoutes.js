@@ -6,6 +6,7 @@ const customerAuthMiddleware = require("../middleware/customerAuthMiddleware");
 const {
   createContact,
   getContacts,
+  getContactById,
   updateContactStatus,
   replyToContact,
   createMobileContact,
@@ -16,6 +17,9 @@ const router = express.Router();
 
 // Submit contact form
 router.post("/", createContact);
+
+// Get one contact message by ID
+router.get("/:id", verifyToken, getContactById);
 
 // Submit contact message from authenticated mobile customer
 router.post("/mobile", customerAuthMiddleware, createMobileContact);

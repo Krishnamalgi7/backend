@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 const StockNotification = require("../models/StockNotification");
 const Phone = require("../models/Phone");
@@ -42,8 +41,17 @@ const subscribeToStockNotification = async (req, res) => {
         });
       }
 
-      return res.status(409).json({
-        message: "A request already exists for this phone",
+      existingRequest.status = "pending";
+      existingRequest.notifiedAt = null;
+      existingRequest.readAt = null;
+
+      await existingRequest.save();
+
+      req.app.get("io").emit("new-stock-notification", existingRequest);
+
+      return res.status(200).json({
+        message: "We will notify you when this phone is available",
+        notification: existingRequest,
       });
     }
 
@@ -51,6 +59,8 @@ const subscribeToStockNotification = async (req, res) => {
       customerId,
       phoneId,
     });
+
+    req.app.get("io").emit("new-stock-notification", notification);
 
     return res.status(201).json({
       message: "We will notify you when this phone is available",
@@ -70,7 +80,6 @@ const subscribeToStockNotification = async (req, res) => {
     });
   }
 };
-
 
 const getMyStockNotifications = async (req, res) => {
   try {
@@ -92,7 +101,6 @@ const getMyStockNotifications = async (req, res) => {
   }
 };
 
-
 const getAllStockNotifications = async (req, res) => {
   try {
     const notifications = await StockNotification.find()
@@ -109,7 +117,6 @@ const getAllStockNotifications = async (req, res) => {
     });
   }
 };
-
 
 const getUnreadStockNotificationCount = async (req, res) => {
   try {
@@ -130,7 +137,6 @@ const getUnreadStockNotificationCount = async (req, res) => {
     });
   }
 };
-
 
 const markMyStockNotificationsRead = async (req, res) => {
   try {

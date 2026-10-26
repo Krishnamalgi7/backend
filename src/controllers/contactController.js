@@ -27,11 +27,78 @@ const createContact = async (req, res) => {
 // Get all contact messages
 const getContacts = async (req, res) => {
   try {
-    const contacts = await Contact.find().sort({
-      createdAt: -1,
-    });
+    const { search = "", status = "all", page = "1", limit = "20" } = req.query;
 
-    res.status(200).json(contacts);
+    const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Number.parseInt(limit, 10) || 20),
+    );
+
+    const filter = {};
+
+if (status !== "all") {
+  if (!["pending", "in_progress", "completed"].includes(status)) {
+    return res.status(400).json({
+      message: "Invalid contact status filter",
+    });
+  }
+
+  filter.status = status;
+}
+
+    if (typeof search === "string" && search.trim()) {
+      const escapedSearch = search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      filter.$or = [
+        { name: { $regex: escapedSearch, $options: "i" } },
+        { phone: { $regex: escapedSearch, $options: "i" } },
+      ];
+    }
+
+    const [contacts, total] = await Promise.all([
+      Contact.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            statusOrder: {
+              $switch: {
+                branches: [
+                  {
+                    case: { $eq: ["$status", "pending"] },
+                    then: 0,
+                  },
+                  {
+                    case: { $eq: ["$status", "in_progress"] },
+                    then: 1,
+                  },
+                  {
+                    case: { $eq: ["$status", "completed"] },
+                    then: 2,
+                  },
+                ],
+                default: 3,
+              },
+            },
+          },
+        },
+        { $sort: { statusOrder: 1, createdAt: -1, _id: -1 } },
+        { $skip: (pageNumber - 1) * pageSize },
+        { $limit: pageSize },
+        { $project: { statusOrder: 0 } },
+      ]),
+      Contact.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      contacts,
+      total,
+      page: pageNumber,
+      limit: pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
   } catch (error) {
     console.error("Failed to fetch contacts:", error);
 
@@ -41,14 +108,51 @@ const getContacts = async (req, res) => {
   }
 };
 
+// Get one contact message by ID
+const getContactById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return res.status(400).json({
+        message: "Invalid contact ID",
+      });
+    }
+
+    const contact = await Contact.findById(id);
+
+    if (!contact) {
+      return res.status(404).json({
+        message: "Contact message not found",
+      });
+    }
+
+    return res.status(200).json({ contact });
+  } catch (error) {
+    console.error("Failed to fetch contact details:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch contact details",
+    });
+  }
+};
+
 // Mark a contact message as completed
 const updateContactStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const { status } = req.body;
+
+    if (!["pending", "in_progress", "completed"].includes(status)) {
+      return res.status(400).json({
+        message: "Invalid contact status",
+      });
+    }
+
     const contact = await Contact.findByIdAndUpdate(
       id,
-      { status: "completed" },
+      { status },
       { new: true },
     );
 
@@ -91,13 +195,7 @@ const replyToContact = async (req, res) => {
       });
     }
 
-    const isFirstReply = !contact.reply?.trim();
-
     contact.reply = reply.trim();
-
-    if (isFirstReply) {
-      contact.status = "completed";
-    }
 
     await contact.save();
 
@@ -145,6 +243,8 @@ const createMobileContact = async (req, res) => {
       customerId,
     });
 
+    req.app.get("io").emit("new-contact-message", contact);
+
     return res.status(201).json({
       message: "Message submitted successfully",
       contact,
@@ -186,6 +286,7 @@ const getMyMobileContacts = async (req, res) => {
 module.exports = {
   createContact,
   getContacts,
+  getContactById,
   updateContactStatus,
   replyToContact,
   createMobileContact,

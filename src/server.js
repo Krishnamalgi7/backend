@@ -3,6 +3,10 @@ const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
 
+// Socket.io setup
+const http = require("http");
+const { Server } = require("socket.io");
+
 const connectDB = require("./config/db");
 const phoneRoutes = require("./routes/phoneRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
@@ -21,6 +25,25 @@ const ratingRoutes = require("./routes/ratingRoutes");
 const stockNotificationRoutes = require("./routes/stockNotificationRoutes");
 
 const app = express();
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PATCH"],
+  },
+});
+
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+  });
+});
 
 app.use(cors());
 app.use(express.json());
@@ -50,7 +73,7 @@ app.get("/", (req, res) => {
 });
 
 connectDB().then(() => {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 });
