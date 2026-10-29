@@ -65,6 +65,12 @@ const contactSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Track whether the admin has read this query notification.
+    adminNotificationReadAt: {
+      type: Date,
+      default: null,
+    },
+
     status: {
       type: String,
       enum: ["pending", "in_progress", "completed"],

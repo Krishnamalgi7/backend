@@ -380,7 +380,6 @@ const getPhoneFilters = async (req, res) => {
         .sort({ value: 1 }),
     ]);
 
-
     const priceRange = priceStats[0] || {
       minPrice: 0,
       maxPrice: 0,
@@ -816,9 +815,8 @@ const updatePhone = async (req, res) => {
         }
       }
 
-      /*
-       * Create phone folder if it does not exist
-       */
+      //Create phone folder if it does not exist
+
       const phoneFolderName = name.trim();
 
       const phoneFolderPath = path.join(
@@ -868,31 +866,24 @@ const updatePhone = async (req, res) => {
 
       let imagesToRemove = [];
 
-      
+      if (removedAdditionalImages) {
+        try {
+          const parsedImages = JSON.parse(removedAdditionalImages);
 
-if (removedAdditionalImages) {
-  try {
-    const parsedImages = JSON.parse(removedAdditionalImages);
-
-    imagesToRemove = parsedImages.map((image) => {
-      try {
-        // Convert a full image URL into its stored relative path.
-        // Example: https://backend.example.com/uploads/Phone/image.jpg
-        // becomes: /uploads/Phone/image.jpg
-        return decodeURIComponent(new URL(image).pathname);
-      } catch {
-        // If it is already a relative path, keep it unchanged.
-        return image;
+          imagesToRemove = parsedImages.map((image) => {
+            try {
+              return decodeURIComponent(new URL(image).pathname);
+            } catch {
+              // If it is already a relative path, keep it unchanged.
+              return image;
+            }
+          });
+        } catch (error) {
+          return res.status(400).json({
+            message: "Invalid removed additional images data",
+          });
+        }
       }
-    });
-  } catch (error) {
-    return res.status(400).json({
-      message: "Invalid removed additional images data",
-    });
-  }
-}
-
-
 
       const remainingImages = existingImages.filter(
         (image) => !imagesToRemove.includes(image),
@@ -956,7 +947,6 @@ if (removedAdditionalImages) {
       updateData.images = [...remainingImages, ...newAdditionalImages];
     }
 
-    
     // UPDATE PHONE
     const previousQuantity = phone.quantity;
 
@@ -970,7 +960,7 @@ if (removedAdditionalImages) {
     );
 
     // Detect when an out-of-stock phone becomes available
-    
+
     if (previousQuantity === 0 && updatedPhone.quantity > 0) {
       await StockNotification.updateMany(
         {
@@ -984,6 +974,15 @@ if (removedAdditionalImages) {
           },
         },
       );
+
+      //Socket for instant notification
+      const io = req.app.get("io");
+
+      if (io) {
+        io.emit("stock-notifications-processed", {
+          phoneId: updatedPhone._id,
+        });
+      }
     }
 
     res.status(200).json({

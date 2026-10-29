@@ -12,6 +12,8 @@ const {
   getUnreadStockNotificationCount,
   markMyStockNotificationsRead,
   getAllStockNotifications,
+  getAdminNotificationSummary,
+  getAdminPendingStockNotifications,
 } = require("../controllers/stockNotificationController");
 
 router.post(
@@ -38,6 +40,18 @@ router.patch(
   markMyStockNotificationsRead,
 );
 
+router.get(
+  "/admin/summary",
+  authMiddleware,
+  getAdminNotificationSummary,
+);
+
 router.get("/admin/all", authMiddleware, getAllStockNotifications);
+
+router.get(
+  "/admin/pending",
+  authMiddleware,
+  getAdminPendingStockNotifications,
+);
 
 module.exports = router;

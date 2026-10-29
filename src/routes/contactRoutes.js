@@ -13,6 +13,8 @@ const {
   getMyMobileContacts,
   getMyUnreadQueryNotificationCount,
   markMyQueryNotificationRead,
+  getAdminQueryNotifications,
+  markAdminQueryNotificationRead,
 } = require("../controllers/contactController");
 
 const router = express.Router();
@@ -28,6 +30,19 @@ router.post("/mobile", customerAuthMiddleware, createMobileContact);
 
 // Get all contact messages
 router.get("/", verifyToken, getContacts);
+
+// Get unread pending notifications for the admin popup
+router.get(
+  "/admin/notifications",
+  verifyToken,
+  getAdminQueryNotifications,
+);
+
+router.patch(
+  "/:id/admin-notification/read",
+  verifyToken,
+  markAdminQueryNotificationRead,
+);
 
 // Mark contact message as completed
 router.patch("/:id/status", verifyToken, updateContactStatus);

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const StockNotification = require("../models/StockNotification");
 const Phone = require("../models/Phone");
+const Contact = require("../models/Contact");
 
 // Customer subscribes to a phone that is out of stock
 const subscribeToStockNotification = async (req, res) => {
@@ -118,6 +119,31 @@ const getAllStockNotifications = async (req, res) => {
   }
 };
 
+const getAdminPendingStockNotifications = async (req, res) => {
+  try {
+    const notifications = await StockNotification.find({
+      status: "pending",
+    })
+      .populate("customerId")
+      .populate(
+        "phoneId",
+        "name image imageUrl price totalPrice quantity",
+      )
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json(notifications);
+  } catch (error) {
+    console.error(
+      "Failed to fetch pending stock notifications:",
+      error,
+    );
+
+    return res.status(500).json({
+      message: "Failed to fetch pending stock notifications",
+    });
+  }
+};
+
 const getUnreadStockNotificationCount = async (req, res) => {
   try {
     const customerId = req.customer.customerId;
@@ -134,6 +160,33 @@ const getUnreadStockNotificationCount = async (req, res) => {
 
     return res.status(500).json({
       message: "Failed to fetch unread notification count",
+    });
+  }
+};
+
+const getAdminNotificationSummary = async (req, res) => {
+  try {
+    const [unreadQueryCount, pendingStockCount] = await Promise.all([
+      Contact.countDocuments({
+        status: "pending",
+        adminNotificationReadAt: null,
+      }),
+
+      StockNotification.countDocuments({
+        status: "pending",
+      }),
+    ]);
+
+    return res.status(200).json({
+      unreadQueryCount,
+      pendingStockCount,
+      unreadCount: unreadQueryCount + pendingStockCount,
+    });
+  } catch (error) {
+    console.error("Failed to fetch admin notification summary:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch admin notification summary",
     });
   }
 };
@@ -170,4 +223,6 @@ module.exports = {
   getAllStockNotifications,
   getUnreadStockNotificationCount,
   markMyStockNotificationsRead,
+  getAdminNotificationSummary,
+  getAdminPendingStockNotifications,
 };

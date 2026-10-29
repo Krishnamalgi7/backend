@@ -141,6 +141,38 @@ const getContacts = async (req, res) => {
   }
 };
 
+
+const getAdminQueryNotifications = async (req, res) => {
+  try {
+    const filter = {
+      status: "pending",
+      adminNotificationReadAt: null,
+    };
+
+    const [notifications, unreadCount] = await Promise.all([
+      Contact.find(filter)
+        .select("name phone message status createdAt")
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+
+      Contact.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      notifications,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error("Failed to fetch admin query notifications:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch admin query notifications",
+    });
+  }
+};
+
+
 // Get one contact message by ID
 const getContactById = async (req, res) => {
   try {
@@ -280,6 +312,65 @@ const replyToContact = async (req, res) => {
     });
   }
 };
+
+// 
+const markAdminQueryNotificationRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+      return res.status(400).json({
+        message: "Invalid contact ID",
+      });
+    }
+
+    const contact = await Contact.findOneAndUpdate(
+      {
+        _id: id,
+        adminNotificationReadAt: null,
+      },
+      {
+        $set: { adminNotificationReadAt: new Date() },
+      },
+      { new: true },
+    );
+
+    if (!contact) {
+      const existingContact = await Contact.findById(id);
+
+      if (!existingContact) {
+        return res.status(404).json({
+          message: "Contact message not found",
+        });
+      }
+
+      return res.status(200).json({
+        message: "Query notification was already read",
+        contact: existingContact,
+      });
+    }
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.emit("admin-query-notification-read", {
+        contactId: contact._id,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Query notification marked as read",
+      contact,
+    });
+  } catch (error) {
+    console.error("Failed to mark admin query notification as read:", error);
+
+    return res.status(500).json({
+      message: "Failed to mark query notification as read",
+    });
+  }
+};
+
 
 // Create a contact message from an authenticated mobile customer
 const createMobileContact = async (req, res) => {
@@ -436,4 +527,6 @@ module.exports = {
   getMyMobileContacts,
   getMyUnreadQueryNotificationCount,
   markMyQueryNotificationRead,
+  markAdminQueryNotificationRead,
+  getAdminQueryNotifications,
 };
