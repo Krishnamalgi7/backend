@@ -121,17 +121,39 @@ const getAllStockNotifications = async (req, res) => {
 
 const getAdminPendingStockNotifications = async (req, res) => {
   try {
-    const notifications = await StockNotification.find({
-      status: "pending",
-    })
-      .populate("customerId")
-      .populate(
-        "phoneId",
-        "name image imageUrl price totalPrice quantity",
-      )
-      .sort({ createdAt: -1 });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      10,
+      Math.max(1, parseInt(req.query.limit, 10) || 3),
+    );
 
-    return res.status(200).json(notifications);
+    const filter = { status: "pending" };
+
+    const [notifications, total] = await Promise.all([
+      StockNotification.find(filter)
+        .populate("customerId")
+        .populate(
+          "phoneId",
+          "name image imageUrl price totalPrice quantity",
+        )
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+
+      StockNotification.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      notifications,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
   } catch (error) {
     console.error(
       "Failed to fetch pending stock notifications:",

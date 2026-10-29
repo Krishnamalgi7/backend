@@ -144,6 +144,12 @@ const getContacts = async (req, res) => {
 
 const getAdminQueryNotifications = async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      10,
+      Math.max(1, parseInt(req.query.limit, 10) || 3),
+    );
+
     const filter = {
       status: "pending",
       adminNotificationReadAt: null,
@@ -153,7 +159,8 @@ const getAdminQueryNotifications = async (req, res) => {
       Contact.find(filter)
         .select("name phone message status createdAt")
         .sort({ createdAt: -1 })
-        .limit(5)
+        .skip((page - 1) * limit)
+        .limit(limit)
         .lean(),
 
       Contact.countDocuments(filter),
@@ -162,6 +169,13 @@ const getAdminQueryNotifications = async (req, res) => {
     return res.status(200).json({
       notifications,
       unreadCount,
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(unreadCount / limit),
+        hasNextPage: page * limit < unreadCount,
+        hasPreviousPage: page > 1,
+      },
     });
   } catch (error) {
     console.error("Failed to fetch admin query notifications:", error);
